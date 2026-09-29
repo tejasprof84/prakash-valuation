@@ -537,6 +537,74 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
 [data-reveal].is-in{opacity:1;transform:none}
 .scr-glyph{color:var(--accent);opacity:.85}
 
+
+/* ════════════════════════════════════════════════════════════════════
+   ASSET CLASSES — photo tiles with an animated survey frame
+   ════════════════════════════════════════════════════════════════════ */
+.assets{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(10px,1.4vw,18px);margin-top:44px}
+@media (max-width:900px){.assets{grid-template-columns:repeat(2,1fr)}}
+.asset{position:relative;aspect-ratio:3/4;overflow:hidden;background:#0c0c0c;border:1px solid var(--glass-edge)}
+.asset img{width:100%;height:100%;object-fit:cover;filter:grayscale(.85) contrast(1.1) brightness(.7);
+  transform:scale(1.15);transition:filter 1s var(--ease)}
+.asset.is-in img{animation:kenburns 14s ease-in-out infinite alternate}
+@keyframes kenburns{from{transform:scale(1.15) translate(0,0)}to{transform:scale(1.28) translate(-3%,-2%)}}
+.asset:hover img{filter:grayscale(0) contrast(1.05) brightness(.8)}
+.asset::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(5,5,5,.9),transparent 55%)}
+.asset svg{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+.asset .frame{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:60 400;stroke-dashoffset:60;
+  transition:stroke-dashoffset 1.4s var(--ease)}
+.asset.is-in .frame{stroke-dashoffset:0}
+.asset .dim{stroke:#00ff66;stroke-width:1;opacity:0;transition:opacity .6s 1s}
+.asset.is-in .dim{opacity:.9}
+.asset .scanline{position:absolute;left:0;right:0;height:1px;background:var(--accent);box-shadow:0 0 12px var(--accent);z-index:2;top:0;opacity:0}
+.asset.is-in .scanline{animation:scanY 4s var(--ease) infinite}
+.asset__txt{position:absolute;left:14px;right:14px;bottom:14px;z-index:3;color:#f5f5f5}
+.asset__txt b{display:block;font-family:var(--f-display);font-weight:800;font-size:clamp(16px,1.6vw,22px);text-transform:uppercase;letter-spacing:-.01em}
+.asset__txt span{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#00ff66}
+.asset__tag{position:absolute;top:12px;left:12px;z-index:3;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;color:#f5f5f5;background:rgba(5,5,5,.6);padding:4px 7px;border:1px solid rgba(0,255,102,.5)}
+
+/* ════════════════════════════════════════════════════════════════════
+   PROCESS — sticky blueprint that builds up as the steps scroll by
+   ════════════════════════════════════════════════════════════════════ */
+.process{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,60px);margin-top:44px;align-items:start}
+.bp{position:sticky;top:96px;padding:clamp(12px,2vw,20px)}
+.bp svg{width:100%;height:auto;display:block}
+.bp__hdr{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-dim);margin-bottom:10px}
+.bp__hdr b{color:var(--accent);font-weight:500}
+.bp .grid line{stroke:var(--fg-faint);stroke-width:.5}
+.bp .ink{fill:none;stroke:var(--fg);stroke-width:1.6;stroke-linejoin:round;stroke-dasharray:900;stroke-dashoffset:900;transition:stroke-dashoffset 2.4s var(--ease)}
+.bp .acc{stroke:var(--accent)}
+.bp .txt{font-family:var(--f-mono);font-size:10px;fill:var(--fg);letter-spacing:.06em}
+.bp .txt.acc{fill:var(--accent);stroke:none}
+.bp .s{opacity:0;transition:opacity .7s var(--ease),transform .9s var(--ease)}
+.bp.st0 .ink{stroke-dashoffset:0}
+.bp.st1 .s1,.bp.st2 .s2,.bp.st3 .s3,.bp.st4 .s4{opacity:1;transform:none}
+.bp .pin{transform:translateY(-40px)}
+.bp .pulse{transform-origin:center;transform-box:fill-box;animation:ping 1.8s ease-out infinite}
+@keyframes ping{from{transform:scale(.4);opacity:.9}to{transform:scale(2.4);opacity:0}}
+.bp .bar{transform-origin:bottom;transform-box:fill-box;transform:scaleY(0);transition:transform 1s var(--ease)}
+.bp.st3 .bar{transform:scaleY(1)}
+.bp.st3 .bar:nth-child(2){transition-delay:.15s}.bp.st3 .bar:nth-child(3){transition-delay:.3s}
+.bp .stamp{transform:scale(1.8) rotate(-24deg);transform-origin:center;transform-box:fill-box}
+.bp.st4 .stamp{transform:scale(1) rotate(-12deg)}
+.bp__foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:10px;margin-top:10px;font-family:var(--f-mono);font-size:11px;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.06em}
+.bp__foot b{font-family:var(--f-display);font-size:clamp(18px,2vw,26px);color:var(--fg);letter-spacing:-.01em}
+.steps{display:flex;flex-direction:column;gap:clamp(14px,2vw,22px)}
+.step{display:grid;grid-template-columns:clamp(90px,11vw,140px) 1fr;gap:18px;padding:14px;align-items:center;
+  opacity:.45;transition:opacity .5s,border-color .5s}
+.step.is-active{opacity:1;border-color:rgba(var(--accent-rgb),.55)}
+.step img{width:100%;aspect-ratio:1;object-fit:cover;filter:grayscale(1) brightness(.8);transition:filter .6s}
+.step.is-active img{filter:none}
+.step .mono{font-size:11px;color:var(--accent);letter-spacing:.1em}
+.step h4{font-family:var(--f-display);font-weight:700;font-size:clamp(16px,1.5vw,20px);text-transform:uppercase;margin:4px 0 6px;line-height:1.1}
+.step p{color:var(--fg-dim);font-size:14px}
+@media (min-width:861px){.steps{padding-bottom:18vh}.step{min-height:34vh}}
+@media (max-width:860px){
+  .process{grid-template-columns:1fr}
+  .bp{position:relative;top:auto}
+  .step{opacity:1}
+}
+
 /* ── Phone layout ───────────────────────────────────────────── */
 @media (max-width:560px){
   .hud{top:10px;padding:8px 8px 8px 12px}
@@ -586,7 +654,7 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
   <ul class="hud__links">
     <li><a href="#about" data-snap><span>01</span>Profile</a></li>
     <li><a href="#services" data-snap><span>02</span>Services</a></li>
-    <li><a href="#method" data-snap><span>03</span>Method</a></li>
+    <li><a href="#process" data-snap><span>03</span>Process</a></li>
     <li><a href="#record" data-snap><span>04</span>Record</a></li>
     <li><a href="#contact" data-snap><span>05</span>Engage</a></li>
   </ul>
@@ -686,6 +754,56 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
     </div>
   </section>
 
+
+  <!-- ════════════════════ ASSET CLASSES ════════════════════ -->
+  <section id="assets" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>Asset classes valued</p>
+      <div class="assets">
+        <figure class="asset" data-asset>
+          <img loading="lazy" alt="Residential property" src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=700&q=70&auto=format&fit=crop" onerror="this.remove()">
+          <span class="scanline" aria-hidden="true"></span>
+          <svg viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">
+            <path class="frame" d="M20 60 V20 H60 M240 20 H280 V60 M280 340 V380 H240 M60 380 H20 V340"/>
+            <g class="dim"><line x1="40" y1="300" x2="260" y2="300"/><line x1="40" y1="294" x2="40" y2="306"/><line x1="260" y1="294" x2="260" y2="306"/></g>
+          </svg>
+          <span class="asset__tag">A·01</span>
+          <figcaption class="asset__txt"><b>Residential</b><span>Flats · villas · houses</span></figcaption>
+        </figure>
+        <figure class="asset" data-asset>
+          <img loading="lazy" alt="Commercial property" src="https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=700&q=70&auto=format&fit=crop" onerror="this.remove()">
+          <span class="scanline" aria-hidden="true"></span>
+          <svg viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">
+            <path class="frame" d="M20 60 V20 H60 M240 20 H280 V60 M280 340 V380 H240 M60 380 H20 V340"/>
+            <g class="dim"><line x1="40" y1="300" x2="260" y2="300"/><line x1="40" y1="294" x2="40" y2="306"/><line x1="260" y1="294" x2="260" y2="306"/></g>
+          </svg>
+          <span class="asset__tag">A·02</span>
+          <figcaption class="asset__txt"><b>Commercial</b><span>Offices · shops · complexes</span></figcaption>
+        </figure>
+        <figure class="asset" data-asset>
+          <img loading="lazy" alt="Industrial property" src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=700&q=70&auto=format&fit=crop" onerror="this.remove()">
+          <span class="scanline" aria-hidden="true"></span>
+          <svg viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">
+            <path class="frame" d="M20 60 V20 H60 M240 20 H280 V60 M280 340 V380 H240 M60 380 H20 V340"/>
+            <g class="dim"><line x1="40" y1="300" x2="260" y2="300"/><line x1="40" y1="294" x2="40" y2="306"/><line x1="260" y1="294" x2="260" y2="306"/></g>
+          </svg>
+          <span class="asset__tag">A·03</span>
+          <figcaption class="asset__txt"><b>Industrial</b><span>Factories · warehouses</span></figcaption>
+        </figure>
+        <figure class="asset" data-asset>
+          <img loading="lazy" alt="Land property" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=700&q=70&auto=format&fit=crop" onerror="this.remove()">
+          <span class="scanline" aria-hidden="true"></span>
+          <svg viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">
+            <path class="frame" d="M20 60 V20 H60 M240 20 H280 V60 M280 340 V380 H240 M60 380 H20 V340"/>
+            <g class="dim"><line x1="40" y1="300" x2="260" y2="300"/><line x1="40" y1="294" x2="40" y2="306"/><line x1="260" y1="294" x2="260" y2="306"/></g>
+          </svg>
+          <span class="asset__tag">A·04</span>
+          <figcaption class="asset__txt"><b>Land</b><span>Plots · agricultural · sites</span></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
   <!-- ════════════════════ SERVICES (MONOLITHS) ════════════════════ -->
   <section id="services">
     <div class="wrap">
@@ -696,7 +814,7 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         <!-- Card 01 -->
         <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
           <div class="mono-card__visual" aria-hidden="true">
-            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
           </div>
           <div class="shutter shutter--top" aria-hidden="true"></div>
           <div class="shutter shutter--bot" aria-hidden="true"></div>
@@ -715,7 +833,7 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         <!-- Card 02 -->
         <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
           <div class="mono-card__visual" aria-hidden="true">
-            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
           </div>
           <div class="shutter shutter--top" aria-hidden="true"></div>
           <div class="shutter shutter--bot" aria-hidden="true"></div>
@@ -734,7 +852,7 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         <!-- Card 03 -->
         <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
           <div class="mono-card__visual" aria-hidden="true">
-            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
           </div>
           <div class="shutter shutter--top" aria-hidden="true"></div>
           <div class="shutter shutter--bot" aria-hidden="true"></div>
@@ -753,10 +871,52 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
     </div>
   </section>
 
+  <!-- ════════════════════ PROCESS (scroll-built blueprint) ════════════════════ -->
+  <section id="process">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>03 / Process</p>
+      <h2 class="h-section" data-scramble-block>How a <em>valuation</em><br>comes together.</h2>
+      <div class="process">
+        <div class="bp pane st0" id="bp">
+          <div class="bp__hdr"><span>Sheet · VAL-001</span><b id="bpStage">Stage 0 / 4</b></div>
+          <svg viewBox="0 0 400 300" role="img" aria-label="Blueprint of a building being inspected, measured, compared and valued">
+            <g class="grid"><line x1="0" y1="0" x2="0" y2="300"/><line x1="25" y1="0" x2="25" y2="300"/><line x1="50" y1="0" x2="50" y2="300"/><line x1="75" y1="0" x2="75" y2="300"/><line x1="100" y1="0" x2="100" y2="300"/><line x1="125" y1="0" x2="125" y2="300"/><line x1="150" y1="0" x2="150" y2="300"/><line x1="175" y1="0" x2="175" y2="300"/><line x1="200" y1="0" x2="200" y2="300"/><line x1="225" y1="0" x2="225" y2="300"/><line x1="250" y1="0" x2="250" y2="300"/><line x1="275" y1="0" x2="275" y2="300"/><line x1="300" y1="0" x2="300" y2="300"/><line x1="325" y1="0" x2="325" y2="300"/><line x1="350" y1="0" x2="350" y2="300"/><line x1="375" y1="0" x2="375" y2="300"/><line x1="400" y1="0" x2="400" y2="300"/><line x1="0" y1="0" x2="400" y2="0"/><line x1="0" y1="25" x2="400" y2="25"/><line x1="0" y1="50" x2="400" y2="50"/><line x1="0" y1="75" x2="400" y2="75"/><line x1="0" y1="100" x2="400" y2="100"/><line x1="0" y1="125" x2="400" y2="125"/><line x1="0" y1="150" x2="400" y2="150"/><line x1="0" y1="175" x2="400" y2="175"/><line x1="0" y1="200" x2="400" y2="200"/><line x1="0" y1="225" x2="400" y2="225"/><line x1="0" y1="250" x2="400" y2="250"/><line x1="0" y1="275" x2="400" y2="275"/><line x1="0" y1="300" x2="400" y2="300"/></g>
+            <!-- building line drawing -->
+            <path class="ink" d="M20 240 H380"/>
+            <path class="ink" d="M70 240 V130 L150 80 L230 130 V240 M60 136 L150 76 L240 136"/>
+            <path class="ink" d="M90 160 h30 v26 h-30 z M180 160 h30 v26 h-30 z M135 240 v-46 h30 v46 M90 206 h30 v20 h-30z M180 206 h30 v20 h-30z"/>
+            <!-- stage 1: site pin -->
+            <g class="s s1 pin"><circle class="pulse" cx="150" cy="58" r="8" fill="none" stroke="#00ff66"/>
+              <path d="M150 62 c-9 -12 -12 -18 -12 -24 a12 12 0 0 1 24 0 c0 6 -3 12 -12 24z" fill="#00ff66"/><circle cx="150" cy="38" r="4" fill="#050505"/>
+              <text class="txt acc" x="170" y="40">SITE VISIT · GEO-TAGGED</text></g>
+            <!-- stage 2: dimensions -->
+            <g class="s s2"><path class="acc" stroke-width="1" d="M70 262 H230 M70 256 v12 M230 256 v12 M252 130 V240 M246 130 h12 M246 240 h12" fill="none"/>
+              <text class="txt acc" x="122" y="278">12.4 m</text><text class="txt acc" x="258" y="190">7.2 m</text>
+              <text class="txt" x="298" y="260">BUILT-UP</text><text class="txt" x="298" y="274">1,850 SQ.FT</text></g>
+            <!-- stage 3: comparables -->
+            <g class="s s3"><g><rect class="bar" x="300" y="170" width="16" height="70" fill="rgba(0,255,102,.35)"/><rect class="bar" x="324" y="150" width="16" height="90" fill="#00ff66"/><rect class="bar" x="348" y="182" width="16" height="58" fill="rgba(0,255,102,.35)"/></g>
+              <text class="txt" x="298" y="140">COMPS ×3</text></g>
+            <!-- stage 4: report stamp -->
+            <g class="s s4 stamp"><rect x="276" y="40" width="104" height="44" fill="none" stroke="#00ff66" stroke-width="2"/>
+              <text x="328" y="68" text-anchor="middle" fill="#00ff66" style="font:700 16px var(--f-mono);letter-spacing:.1em">VALUED</text></g>
+          </svg>
+          <div class="bp__foot"><span>Sample output — fair market value</span><b id="bpValue">₹ —</b></div>
+        </div>
+
+        <div class="steps">
+          <article class="step pane" data-step="1"><img loading="lazy" alt="Engineers on a site survey" src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=300&q=70&auto=format&fit=crop" onerror="this.style.visibility='hidden'"><div><span class="mono">Step 01</span><h4>Site inspection</h4><p>Physical visit, geo-tagged photos, access, surroundings, construction quality and stage.</p></div></article>
+          <article class="step pane" data-step="2"><img loading="lazy" alt="Reviewing building plans" src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=300&q=70&auto=format&fit=crop" onerror="this.style.visibility='hidden'"><div><span class="mono">Step 02</span><h4>Measurement &amp; documents</h4><p>Plot and built-up area measured and checked against sanctioned plans and title documents.</p></div></article>
+          <article class="step pane" data-step="3"><img loading="lazy" alt="Market data analysis" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&q=70&auto=format&fit=crop" onerror="this.style.visibility='hidden'"><div><span class="mono">Step 03</span><h4>Market &amp; income analysis</h4><p>Comparable sales, guidance values and — for businesses — cash flows and asset schedules.</p></div></article>
+          <article class="step pane" data-step="4"><img loading="lazy" alt="Valuation report with calculator" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=300&q=70&auto=format&fit=crop" onerror="this.style.visibility='hidden'"><div><span class="mono">Step 04</span><h4>Valuation report</h4><p>A clear, signed report with method, workings and value conclusion — ready for the bank or client.</p></div></article>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ════════════════════ METHOD ════════════════════ -->
   <section id="method">
     <div class="wrap">
-      <p class="eyebrow" data-scramble>03 / Method</p>
+      <p class="eyebrow" data-scramble>Valuation methods</p>
       <h2 class="h-section" data-scramble-block>How the <em>number</em><br>is built.</h2>
 
       <div class="methods" data-reveal>
@@ -1233,6 +1393,52 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
   const updClock = () => { clock.textContent = fmt.format(new Date()) + ' IST'; };
   updClock(); setInterval(updClock, 1000);
   document.getElementById('yr').textContent = new Date().getFullYear();
+
+
+  /* ══════════════════════════════════════════════════════════════════
+     ASSET TILES + PROCESS BLUEPRINT
+     Desktop: the step nearest the viewport centre sets the blueprint
+     stage. Phones/tablets: the blueprint auto-cycles while visible.
+     ══════════════════════════════════════════════════════════════════ */
+  const aio = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('is-in'); aio.unobserve(e.target); }
+  }), { threshold: 0.25 });
+  document.querySelectorAll('[data-asset]').forEach(el => aio.observe(el));
+
+  const bp = document.getElementById('bp');
+  const bpStage = document.getElementById('bpStage');
+  const bpValue = document.getElementById('bpValue');
+  const steps = [...document.querySelectorAll('[data-step]')];
+  let stage = -1, valAnim = 0;
+  function setStage(n) {
+    if (n === stage) return; stage = n;
+    bp.className = 'bp pane st0' + [1,2,3,4].filter(k => k <= n).map(k => ' st' + k).join('');
+    bpStage.textContent = `Stage ${n} / 4`;
+    steps.forEach(st => st.classList.toggle('is-active', +st.dataset.step === n));
+    cancelAnimationFrame(valAnim);
+    if (n === 4) { // count the sample value up
+      const t0 = performance.now(), to = 84.6;
+      (function f(now){ const p = Math.min((now - t0) / 1200, 1), v = to * (1 - Math.pow(1 - p, 3));
+        bpValue.textContent = '₹ ' + v.toFixed(1) + ' L'; if (p < 1) valAnim = requestAnimationFrame(f); })(t0);
+    } else bpValue.textContent = n >= 2 ? '1,850 sq.ft' : '₹ —';
+  }
+  const WIDE = matchMedia('(min-width: 861px)');
+  let cycle = null, bpVisible = false;
+  new IntersectionObserver(es => { bpVisible = es[0].isIntersecting; if (bpVisible && stage < 0) setStage(0); }, { threshold: 0.2 }).observe(bp);
+  const sio = new IntersectionObserver(es => {
+    if (!WIDE.matches) return;
+    es.forEach(e => { if (e.isIntersecting) setStage(+e.target.dataset.step); });
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  steps.forEach(st => sio.observe(st));
+  function syncMode() {
+    clearInterval(cycle);
+    if (!WIDE.matches) {
+      let k = 0;
+      cycle = setInterval(() => { if (bpVisible) { k = (k % 4) + 1; setStage(k); } }, REDUCED ? 4000 : 2200);
+    }
+  }
+  WIDE.addEventListener ? WIDE.addEventListener('change', syncMode) : WIDE.addListener(syncMode);
+  syncMode();
 
   // Hero role line decodes on load
   requestAnimationFrame(tick);
