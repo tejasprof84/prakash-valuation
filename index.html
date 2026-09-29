@@ -1574,7 +1574,12 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         form.reset();
       } catch (err) {
         btn.disabled = false;
-        status.textContent = 'Could not send — please WhatsApp or call instead';
+        const msg = String(err && err.message || '');
+        // FormSubmit rejects everything until the owner clicks the one-time "Activate Form" email
+        status.textContent = /activat/i.test(msg)
+          ? 'Form awaiting activation — please WhatsApp or call for now'
+          : 'Could not send (' + (msg || 'network error').slice(0, 80) + ') — please WhatsApp or call';
+        console.warn('[enquiry] FormSubmit:', msg);
       }
     });
   }
