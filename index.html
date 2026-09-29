@@ -221,7 +221,7 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
 .eyebrow::before{content:"";width:34px;height:1px;background:var(--accent)}
 .h-section{
   font-family:var(--f-display);font-weight:800;line-height:.92;letter-spacing:-.035em;
-  font-size:clamp(40px,7.4vw,108px);text-transform:uppercase;
+  font-size:clamp(28px,calc((min(100vw,1200px) - 2*var(--gutter)) / 10.5),104px);text-transform:uppercase;
 }
 .h-section em{font-style:normal;color:transparent;-webkit-text-stroke:1px var(--fg)}
 .mono{font-family:var(--f-mono)}
@@ -256,9 +256,10 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
 .hero__meta b{color:var(--accent);font-weight:500}
 .hero__title{
   font-family:var(--f-display);font-weight:800;text-transform:uppercase;
-  font-size:clamp(52px,12.4vw,196px);line-height:.84;letter-spacing:-.05em;
+  /* sized so the widest line ("VALUATION." ≈ 9.6em in Syne 800) always fits */
+  font-size:min(calc((min(100vw,1200px) - 2*var(--gutter)) / 9.9),150px);line-height:.88;letter-spacing:-.05em;
 }
-.hero__title .line{display:block;overflow:hidden}
+.hero__title .line{display:block;overflow:hidden;white-space:nowrap;padding-bottom:.04em}
 .hero__title .line > span{display:inline-block;transform:translateY(105%);animation:rise 1.1s var(--ease) forwards}
 .hero__title .line:nth-child(2) > span{animation-delay:.12s}
 .hero__title .line:nth-child(3) > span{animation-delay:.24s}
@@ -351,7 +352,7 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
   position:relative;min-height:560px;transform-style:preserve-3d;
   will-change:transform;
   display:flex;flex-direction:column;justify-content:space-between;
-  padding:28px;overflow:hidden;
+  padding:28px;overflow:hidden;container-type:inline-size;
 }
 @media (max-width:960px){.mono-card{min-height:500px}}
 /* Visual layer: an architectural photo over a generative fallback gradient,
@@ -389,7 +390,7 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
 .mono-card__idx{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);transition:color .5s}
 .mono-card__idx b{color:var(--accent);font-weight:500}
 .mono-card h3{
-  font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3vw,44px);line-height:.92;overflow-wrap:anywhere;
+  font-family:var(--f-display);font-weight:800;font-size:8.2cqi;line-height:.95;
   text-transform:uppercase;letter-spacing:-.03em;margin-top:26px;transition:color .5s;
 }
 .mono-card p{color:var(--fg-dim);margin-top:14px;max-width:34ch;transition:color .5s}
@@ -468,7 +469,7 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
 .terminal__log .d{color:var(--fg-dim)}
 .caret{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;animation:pulse 1s steps(1) infinite}
 .terminal__actions{padding:clamp(22px,3vw,36px);display:flex;flex-direction:column;gap:14px;justify-content:center}
-.terminal__actions h3{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3.4vw,48px);text-transform:uppercase;line-height:.95;letter-spacing:-.03em;margin-bottom:10px}
+.terminal__actions h3{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,2.8vw,40px);text-transform:uppercase;line-height:.95;letter-spacing:-.03em;margin-bottom:10px}
 
 /* The primary conversion trigger — a "confirm execution" control */
 .confirm{
@@ -498,7 +499,7 @@ section{position:relative;padding:clamp(90px,14vw,170px) 0}
 footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid var(--fg-faint)}
 .footer__big{
   font-family:var(--f-display);font-weight:800;text-transform:uppercase;letter-spacing:-.05em;line-height:.8;
-  font-size:clamp(56px,15vw,240px);color:transparent;-webkit-text-stroke:1px var(--fg-faint);
+  font-size:calc((min(100vw,1200px) - 2*var(--gutter)) / 13.2);color:transparent;-webkit-text-stroke:1px var(--fg-faint);
   white-space:nowrap;overflow:hidden;
 }
 .footer__row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:30px;font-family:var(--f-mono);font-size:12px;color:var(--fg-dim);letter-spacing:.06em;text-transform:uppercase}
