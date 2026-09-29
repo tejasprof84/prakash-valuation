@@ -1073,14 +1073,12 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
             </div>
           </div>
 
-          <!-- RIGHT: enquiry form → delivered to Prakash's inbox via FormSubmit -->
+          <!-- RIGHT: enquiry form → delivered by email via Formspree -->
           <form class="terminal__actions enquiry" id="enquiry"
-                action="https://formsubmit.co/Prakashkumarbangalore121@gmail.com" method="POST" novalidate>
+                action="https://formspree.io/f/mdekbavw" method="POST" novalidate>
             <h3>Send an enquiry</h3>
             <input type="hidden" name="_subject" value="New valuation enquiry — website">
-            <input type="hidden" name="_template" value="table">
-            <input type="hidden" name="_captcha" value="false">
-            <input type="text" name="_honey" class="sr-only" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <input type="text" name="_gotcha" class="sr-only" tabindex="-1" autocomplete="off" aria-hidden="true">
             <div class="f-row">
               <label class="field"><span>Name *</span><input name="name" required autocomplete="name" placeholder="Your full name"></label>
               <label class="field"><span>Email *</span><input name="email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
@@ -1546,8 +1544,8 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
 
 
   /* ══════════════════════════════════════════════════════════════════
-     ENQUIRY FORM — posts to FormSubmit's AJAX endpoint so the visitor
-     stays on the page; falls back to a normal POST if fetch fails.
+     ENQUIRY FORM — AJAX POST to Formspree so the visitor stays on the
+     page. Formspree replies JSON: { ok: true } or { errors: [...] }.
      ══════════════════════════════════════════════════════════════════ */
   const form = document.getElementById('enquiry');
   if (form) {
@@ -1561,25 +1559,19 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         f.closest('.field').classList.toggle('is-bad', bad); if (bad) ok = false;
       });
       if (!ok) { status.textContent = 'Please add your name and a valid email'; return; }
-      if (form.elements._honey.value) return;          // bot trap
+      if (form.elements._gotcha.value) return;          // bot trap
       btn.disabled = true; status.textContent = 'Transmitting…';
       try {
-        const res = await fetch(form.action.replace('formsubmit.co/', 'formsubmit.co/ajax/'), {
-          method: 'POST', headers: { 'Accept': 'application/json' }, body: new FormData(form)
-        });
+        const res = await fetch(form.action, { method: 'POST', headers: { 'Accept': 'application/json' }, body: new FormData(form) });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.success === 'false' || data.success === false) throw new Error(data.message || 'failed');
+        if (!res.ok) throw new Error((data.errors || []).map(x => x.message).join(', ') || ('HTTP ' + res.status));
         form.classList.add('is-sent');
         status.textContent = '✔ Received — Prakash will contact you soon';
         form.reset();
       } catch (err) {
         btn.disabled = false;
-        const msg = String(err && err.message || '');
-        // FormSubmit rejects everything until the owner clicks the one-time "Activate Form" email
-        status.textContent = /activat/i.test(msg)
-          ? 'Form awaiting activation — please WhatsApp or call for now'
-          : 'Could not send (' + (msg || 'network error').slice(0, 80) + ') — please WhatsApp or call';
-        console.warn('[enquiry] FormSubmit:', msg);
+        status.textContent = 'Could not send (' + String(err.message || 'network error').slice(0, 80) + ') — please WhatsApp or call';
+        console.warn('[enquiry] Formspree:', err);
       }
     });
   }
