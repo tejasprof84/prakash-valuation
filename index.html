@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  PRAKASH KUMAR S — PROPERTY & COMPANY VALUATION                      ║
+  ║  Single-file portfolio. Vanilla HTML / CSS / JS. No frameworks.      ║
+  ║                                                                      ║
+  ║  ARCHITECTURE MAP                                                    ║
+  ║   01  Design tokens (CSS custom properties, dark + light spectrum)   ║
+  ║   02  Canvas node-field  — spring physics + cursor repulsion         ║
+  ║   03  Kinetic cursor     — lerped ring, magnetic snap to targets     ║
+  ║   04  Tilt engine        — rAF + lerp 3D pivot for [data-tilt]       ║
+  ║   05  Scramble engine    — IntersectionObserver-driven text decode   ║
+  ║   06  Magnetic buttons   — [data-magnetic] pull toward the pointer   ║
+  ║   07  HUD + theme invert — flips the global colour spectrum          ║
+  ║                                                                      ║
+  ║  PERFORMANCE CONTRACT                                                ║
+  ║   • One shared requestAnimationFrame loop drives every system.       ║
+  ║   • Only transform / opacity are animated (compositor-only).         ║
+  ║   • Node count scales with viewport area and devicePixelRatio caps.  ║
+  ║   • Canvas pauses when the tab is hidden.                            ║
+  ║   • prefers-reduced-motion and touch devices get a calmer build.     ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prakash Kumar S — Property &amp; Company Valuation</title>
+<meta name="description" content="Prakash Kumar S — Property valuation and company valuation services across Bangalore, Mangalore, Mysore, Mandya and Hassan. Civil engineer, MBA (Construction Project Management, RICS SBE).">
+<meta name="theme-color" content="#050505">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   01 · DESIGN TOKENS
+   Every colour on the page resolves through these variables, so the
+   theme inverter only has to flip one attribute on <html>.
+   ════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#050505;
+  --bg-2:#0b0b0b;
+  --fg:#f5f5f5;
+  --fg-dim:rgba(245,245,245,.58);
+  --fg-faint:rgba(245,245,245,.14);
+  --accent:#00ff66;
+  --accent-rgb:0,255,102;
+  --node-rgb:245,245,245;
+  --glass:rgba(18,18,18,.42);
+  --glass-edge:rgba(255,255,255,.09);
+  --shadow:
+      0 1px 0 rgba(255,255,255,.04) inset,
+      0 30px 60px -20px rgba(0,0,0,.8),
+      0 60px 120px -40px rgba(0,0,0,.9);
+
+  --f-display:'Syne',system-ui,sans-serif;
+  --f-body:'Space Grotesk',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+
+  --gutter:clamp(16px,4vw,56px);
+  --ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:dark;
+}
+/* Inverted spectrum — titanium paper, onyx ink, deeper green for contrast */
+:root[data-theme="light"]{
+  --bg:#f2f2ee;
+  --bg-2:#e8e8e3;
+  --fg:#070707;
+  --fg-dim:rgba(7,7,7,.62);
+  --fg-faint:rgba(7,7,7,.14);
+  --accent:#00a843;
+  --accent-rgb:0,168,67;
+  --node-rgb:7,7,7;
+  --glass:rgba(255,255,255,.45);
+  --glass-edge:rgba(0,0,0,.1);
+  --shadow:
+      0 1px 0 rgba(255,255,255,.7) inset,
+      0 30px 60px -24px rgba(0,0,0,.18),
+      0 60px 120px -40px rgba(0,0,0,.2);
+  color-scheme:light;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   BASE
+   ════════════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--f-body);
+  font-size:16px;
+  line-height:1.55;
+  overflow-x:hidden;
+  transition:background .6s var(--ease),color .6s var(--ease);
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent);color:#050505}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* Hide the native cursor only on fine pointers where ours exists */
+@media (hover:hover) and (pointer:fine){
+  html.has-cursor, html.has-cursor *{cursor:none!important}
+}
+
+/* Film-grain + scanline overlay — pure CSS, zero network cost */
+.grain{
+  position:fixed;inset:-50%;z-index:90;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain 1.2s steps(6) infinite;
+}
+@keyframes grain{
+  0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-4%)}
+  60%{transform:translate(-4%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}
+}
+.scan{
+  position:fixed;inset:0;z-index:89;pointer-events:none;opacity:.35;
+  background:repeating-linear-gradient(to bottom,transparent 0 2px,rgba(0,0,0,.18) 3px 3px);
+  mix-blend-mode:multiply;
+}
+:root[data-theme="light"] .scan{opacity:.12}
+
+/* ════════════════════════════════════════════════════════════════════
+   02 · CANVAS FIELD (fixed behind everything)
+   ════════════════════════════════════════════════════════════════════ */
+#field{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+.vignette{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 40%,transparent 40%,var(--bg) 100%);
+  transition:background .6s var(--ease);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   03 · KINETIC CURSOR
+   Core dot follows 1:1. Ring lerps behind; on [data-snap] targets it
+   morphs to the element's bounding box and switches to difference
+   blending so whatever sits beneath inverts.
+   ════════════════════════════════════════════════════════════════════ */
+.cursor-dot,.cursor-ring{
+  position:fixed;top:0;left:0;z-index:1000;pointer-events:none;
+  will-change:transform,width,height;
+  display:none;
+}
+html.has-cursor .cursor-dot,html.has-cursor .cursor-ring{display:block}
+.cursor-dot{
+  width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 12px rgba(var(--accent-rgb),.9);
+}
+.cursor-ring{
+  width:38px;height:38px;border:1px solid var(--fg);border-radius:50%;
+  transition:border-radius .35s var(--ease),background-color .3s var(--ease),border-color .3s;
+}
+.cursor-ring::before,.cursor-ring::after{ /* matrix crosshair ticks */
+  content:"";position:absolute;background:var(--accent);opacity:.9;
+}
+.cursor-ring::before{width:1px;height:8px;left:50%;top:-5px}
+.cursor-ring::after{width:8px;height:1px;top:50%;left:-5px}
+.cursor-ring.is-snapped{
+  border-radius:2px;background:#fff;border-color:#fff;mix-blend-mode:difference;
+}
+.cursor-ring.is-snapped::before,.cursor-ring.is-snapped::after{opacity:0}
+/* Large surfaces (cards) get a frame lock instead of a full inversion,
+   so the revealed imagery stays visible */
+.cursor-ring.is-frame{border-radius:0;background:transparent;border-color:var(--accent);mix-blend-mode:normal;box-shadow:0 0 30px -6px rgba(var(--accent-rgb),.6)}
+.cursor-ring.is-down{background:rgba(var(--accent-rgb),.2)}
+
+/* ════════════════════════════════════════════════════════════════════
+   07 · COMMAND HUD NAVIGATION
+   ════════════════════════════════════════════════════════════════════ */
+.hud{
+  position:fixed;z-index:50;top:14px;left:50%;transform:translateX(-50%);
+  width:min(1200px,calc(100% - 2*var(--gutter)));
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:10px 12px 10px 18px;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(25px) saturate(180%);
+  backdrop-filter:blur(25px) saturate(180%);
+  border:1px solid var(--glass-edge);
+  box-shadow:var(--shadow);
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+}
+.hud::before{ /* hairline accent sweep along the top edge */
+  content:"";position:absolute;left:0;top:-1px;height:1px;width:30%;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:sweep 5s linear infinite;
+}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(430%)}}
+.hud__id{display:flex;align-items:center;gap:10px;font-weight:700;white-space:nowrap}
+.hud__pulse{width:8px;height:8px;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.hud__links{display:flex;gap:4px;list-style:none}
+.hud__links a{display:block;padding:8px 12px;color:var(--fg-dim);transition:color .25s}
+.hud__links a:hover,.hud__links a:focus-visible{color:var(--fg)}
+.hud__links a span{color:var(--accent);margin-right:4px}
+.hud__right{display:flex;align-items:center;gap:8px}
+.theme-toggle{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border:1px solid var(--glass-edge);font-family:var(--f-mono);font-size:11px;
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.theme-toggle__track{width:28px;height:14px;border:1px solid var(--fg);position:relative}
+.theme-toggle__knob{position:absolute;top:2px;left:2px;width:8px;height:8px;background:var(--accent);transition:transform .4s var(--ease)}
+:root[data-theme="light"] .theme-toggle__knob{transform:translateX(14px)}
+.hud__time{color:var(--fg-dim);min-width:74px;text-align:right}
+@media (max-width:860px){.hud__links,.hud__time{display:none}}
+
+/* ════════════════════════════════════════════════════════════════════
+   LAYOUT PRIMITIVES
+   ════════════════════════════════════════════════════════════════════ */
+main{position:relative;z-index:2}
+.wrap{width:min(1200px,100%);margin:0 auto;padding:0 var(--gutter)}
+section{position:relative;padding:clamp(90px,14vw,170px) 0}
+.eyebrow{
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);display:flex;align-items:center;gap:12px;margin-bottom:28px;
+}
+.eyebrow::before{content:"";width:34px;height:1px;background:var(--accent)}
+.h-section{
+  font-family:var(--f-display);font-weight:800;line-height:.92;letter-spacing:-.035em;
+  font-size:clamp(40px,7.4vw,108px);text-transform:uppercase;
+}
+.h-section em{font-style:normal;color:transparent;-webkit-text-stroke:1px var(--fg)}
+.mono{font-family:var(--f-mono)}
+
+/* Glass pane — the structural unit reused across the page */
+.pane{
+  position:relative;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(25px) saturate(180%);
+  backdrop-filter:blur(25px) saturate(180%);
+  border:1px solid var(--glass-edge);
+  box-shadow:var(--shadow);
+}
+.pane::after{ /* corner registration marks */
+  content:"";position:absolute;inset:-1px;pointer-events:none;
+  background:
+    linear-gradient(var(--accent),var(--accent)) top left/14px 1px,
+    linear-gradient(var(--accent),var(--accent)) top left/1px 14px,
+    linear-gradient(var(--accent),var(--accent)) bottom right/14px 1px,
+    linear-gradient(var(--accent),var(--accent)) bottom right/1px 14px;
+  background-repeat:no-repeat;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   HERO
+   ════════════════════════════════════════════════════════════════════ */
+.hero{min-height:100svh;display:flex;align-items:center;padding-top:120px}
+.hero__meta{
+  display:flex;flex-wrap:wrap;gap:10px 28px;margin-bottom:34px;
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-dim);
+}
+.hero__meta b{color:var(--accent);font-weight:500}
+.hero__title{
+  font-family:var(--f-display);font-weight:800;text-transform:uppercase;
+  font-size:clamp(52px,12.4vw,196px);line-height:.84;letter-spacing:-.05em;
+}
+.hero__title .line{display:block;overflow:hidden}
+.hero__title .line > span{display:inline-block;transform:translateY(105%);animation:rise 1.1s var(--ease) forwards}
+.hero__title .line:nth-child(2) > span{animation-delay:.12s}
+.hero__title .line:nth-child(3) > span{animation-delay:.24s}
+@keyframes rise{to{transform:none}}
+.hero__title .outline{color:transparent;-webkit-text-stroke:1.5px var(--fg)}
+.hero__title .dot{color:var(--accent)}
+.hero__row{
+  display:grid;grid-template-columns:1.2fr 1fr;gap:clamp(24px,5vw,80px);align-items:end;margin-top:clamp(36px,6vw,70px);
+}
+.hero__lede{font-size:clamp(17px,1.6vw,21px);color:var(--fg-dim);max-width:560px}
+.hero__lede strong{color:var(--fg);font-weight:600}
+.hero__role{
+  font-family:var(--f-mono);font-size:13px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--fg);margin-bottom:16px;min-height:1.4em;
+}
+.hero__cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:flex-end}
+@media (max-width:760px){
+  .hero__row{grid-template-columns:1fr}
+  .hero__cta{justify-content:flex-start}
+}
+
+/* Magnetic trigger button */
+.btn{
+  --pad:20px 28px;
+  position:relative;display:inline-flex;align-items:center;gap:14px;padding:var(--pad);
+  font-family:var(--f-mono);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--fg);overflow:hidden;isolation:isolate;
+  will-change:transform;
+}
+.btn::before{ /* wipe fill */
+  content:"";position:absolute;inset:0;z-index:-1;background:var(--accent);
+  transform:scaleX(0);transform-origin:right;transition:transform .5s var(--ease);
+}
+.btn:hover::before,.btn:focus-visible::before{transform:scaleX(1);transform-origin:left}
+.btn:hover,.btn:focus-visible{color:#050505;border-color:var(--accent)}
+.btn--solid{background:var(--accent);color:#050505;border-color:var(--accent)}
+.btn--solid::before{background:var(--fg)}
+.btn--solid:hover,.btn--solid:focus-visible{color:var(--bg);border-color:var(--fg)}
+.btn__arrow{display:inline-block;transition:transform .4s var(--ease)}
+.btn:hover .btn__arrow{transform:translateX(5px) rotate(-45deg)}
+.btn__label{display:inline-block;will-change:transform}
+
+.scroll-cue{
+  position:absolute;left:var(--gutter);bottom:28px;font-family:var(--f-mono);font-size:11px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--fg-dim);display:flex;align-items:center;gap:12px;
+}
+.scroll-cue i{width:1px;height:44px;background:var(--fg-faint);position:relative;overflow:hidden}
+.scroll-cue i::after{content:"";position:absolute;left:0;top:-50%;width:1px;height:50%;background:var(--accent);animation:drip 1.8s var(--ease) infinite}
+@keyframes drip{to{top:100%}}
+
+/* ════════════════════════════════════════════════════════════════════
+   TICKER
+   ════════════════════════════════════════════════════════════════════ */
+.ticker{
+  position:relative;z-index:2;border-block:1px solid var(--fg-faint);overflow:hidden;
+  background:var(--bg);transition:background .6s var(--ease);
+}
+.ticker__track{display:flex;width:max-content;animation:tick 38s linear infinite}
+.ticker__item{
+  display:flex;align-items:center;gap:36px;padding:22px 36px 22px 0;white-space:nowrap;
+  font-family:var(--f-display);font-weight:700;font-size:clamp(20px,3vw,34px);text-transform:uppercase;letter-spacing:-.01em;
+}
+.ticker__item::after{content:"✦";color:var(--accent);font-size:.6em}
+@keyframes tick{to{transform:translateX(-50%)}}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATS
+   ════════════════════════════════════════════════════════════════════ */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--fg-faint);border:1px solid var(--fg-faint);margin-top:60px}
+.stat{background:var(--bg);padding:34px 26px;transition:background .6s var(--ease)}
+.stat__n{font-family:var(--f-display);font-weight:800;font-size:clamp(46px,6vw,84px);line-height:1;letter-spacing:-.04em}
+.stat__n sup{font-size:.4em;color:var(--accent);vertical-align:top;margin-left:4px}
+.stat__l{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-dim);margin-top:14px}
+@media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+.about__grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,6vw,90px);margin-top:60px}
+.about__grid p{color:var(--fg-dim);font-size:clamp(16px,1.35vw,19px)}
+.about__grid p + p{margin-top:18px}
+.about__grid strong{color:var(--fg);font-weight:600}
+@media (max-width:760px){.about__grid{grid-template-columns:1fr}}
+
+/* ════════════════════════════════════════════════════════════════════
+   04 · SERVICE MONOLITH GRID (3D tilt + split-reveal overlay)
+   ════════════════════════════════════════════════════════════════════ */
+.monoliths{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2vw,26px);margin-top:70px;
+  perspective:1400px;
+}
+@media (max-width:960px){.monoliths{grid-template-columns:1fr}}
+.mono-card{
+  position:relative;min-height:560px;transform-style:preserve-3d;
+  will-change:transform;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:28px;overflow:hidden;
+}
+@media (max-width:960px){.mono-card{min-height:500px}}
+/* Visual layer: an architectural photo over a generative fallback gradient,
+   so the card still looks intentional if the image is slow or blocked. */
+.mono-card__visual{
+  position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(120% 80% at 80% 0%,rgba(var(--accent-rgb),.25),transparent 60%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 44px),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 44px),
+    #0c0c0c;
+}
+.mono-card__visual img{
+  width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.15) brightness(.75);
+  transform:scale(1.18);transition:transform 1.4s var(--ease),filter 1s var(--ease);
+}
+.mono-card:hover .mono-card__visual img{transform:scale(1.04);filter:grayscale(.2) contrast(1.1) brightness(.85)}
+/* The two shutters that split open on hover */
+.shutter{
+  position:absolute;left:0;right:0;height:50.5%;z-index:1;
+  background:var(--bg-2);
+  transition:transform 1s var(--ease),background .6s var(--ease);
+}
+.shutter--top{top:0;border-bottom:1px solid rgba(var(--accent-rgb),.6)}
+.shutter--bot{bottom:0;border-top:1px solid rgba(var(--accent-rgb),.6)}
+.mono-card:hover .shutter--top,.mono-card:focus-within .shutter--top{transform:translateY(-101%)}
+.mono-card:hover .shutter--bot,.mono-card:focus-within .shutter--bot{transform:translateY(101%)}
+.mono-card__shade{ /* legibility gradient once shutters open */
+  position:absolute;inset:0;z-index:1;
+  background:linear-gradient(to top,rgba(5,5,5,.95) 10%,rgba(5,5,5,.2) 60%,rgba(5,5,5,.6));
+  opacity:0;transition:opacity .8s var(--ease);
+}
+.mono-card:hover .mono-card__shade,.mono-card:focus-within .mono-card__shade{opacity:1}
+.mono-card > header,.mono-card > footer{position:relative;z-index:2;transform:translateZ(60px)}
+.mono-card__idx{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);transition:color .5s}
+.mono-card__idx b{color:var(--accent);font-weight:500}
+.mono-card h3{
+  font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3vw,44px);line-height:.92;overflow-wrap:anywhere;
+  text-transform:uppercase;letter-spacing:-.03em;margin-top:26px;transition:color .5s;
+}
+.mono-card p{color:var(--fg-dim);margin-top:14px;max-width:34ch;transition:color .5s}
+.mono-card ul{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.mono-card li{
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  padding:6px 10px;border:1px solid var(--glass-edge);transition:border-color .5s,color .5s;
+}
+/* Once revealed, text sits on a dark photo → force light ink in both themes */
+.mono-card:hover h3,.mono-card:hover .mono-card__idx,.mono-card:hover li,
+.mono-card:focus-within h3,.mono-card:focus-within .mono-card__idx,.mono-card:focus-within li{color:#f5f5f5}
+.mono-card:hover p,.mono-card:focus-within p{color:rgba(245,245,245,.8)}
+.mono-card:hover li,.mono-card:focus-within li{border-color:rgba(245,245,245,.25)}
+.mono-card__glare{
+  position:absolute;inset:0;z-index:3;pointer-events:none;mix-blend-mode:overlay;opacity:0;
+  background:radial-gradient(500px circle at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.35),transparent 45%);
+  transition:opacity .4s;
+}
+.mono-card:hover .mono-card__glare{opacity:1}
+
+/* ════════════════════════════════════════════════════════════════════
+   METHODS
+   ════════════════════════════════════════════════════════════════════ */
+.methods{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--fg-faint);border:1px solid var(--fg-faint);margin-top:70px}
+.method{background:var(--bg);padding:clamp(24px,3vw,40px);display:grid;grid-template-columns:auto 1fr;gap:22px;transition:background .6s var(--ease)}
+.method__code{font-family:var(--f-mono);font-size:12px;color:var(--accent);letter-spacing:.1em;padding-top:6px}
+.method h4{font-family:var(--f-display);font-size:clamp(22px,2.2vw,30px);font-weight:700;text-transform:uppercase;letter-spacing:-.02em;line-height:1}
+.method p{color:var(--fg-dim);margin-top:10px}
+@media (max-width:760px){.methods{grid-template-columns:1fr}}
+
+/* ════════════════════════════════════════════════════════════════════
+   EXPERIENCE LOG
+   ════════════════════════════════════════════════════════════════════ */
+.log{margin-top:70px;border-top:1px solid var(--fg-faint)}
+.log__row{
+  display:grid;grid-template-columns:170px 1.4fr 1fr;gap:24px;align-items:baseline;
+  padding:30px 0;border-bottom:1px solid var(--fg-faint);position:relative;
+}
+.log__row::before{
+  content:"";position:absolute;left:0;bottom:-1px;height:1px;width:100%;background:var(--accent);
+  transform:scaleX(0);transform-origin:left;transition:transform .7s var(--ease);
+}
+.log__row:hover::before{transform:scaleX(1)}
+.log__when{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;color:var(--fg-dim);text-transform:uppercase}
+.log__when b{color:var(--accent);font-weight:500;display:block}
+.log__what h4{font-family:var(--f-display);font-weight:700;font-size:clamp(22px,2.4vw,32px);text-transform:uppercase;letter-spacing:-.02em;line-height:1.02}
+.log__what span{display:block;font-family:var(--f-mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-dim);margin-top:8px}
+.log__desc{color:var(--fg-dim);font-size:15px}
+@media (max-width:860px){.log__row{grid-template-columns:1fr;gap:10px}}
+.edu{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2vw,26px);margin-top:40px}
+.edu .pane{padding:26px}
+.edu h5{font-family:var(--f-display);font-size:22px;text-transform:uppercase;line-height:1.05;letter-spacing:-.01em}
+.edu p{color:var(--fg-dim);font-size:14px;margin-top:10px}
+.edu .mono{font-size:11px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+@media (max-width:860px){.edu{grid-template-columns:1fr}}
+
+/* ════════════════════════════════════════════════════════════════════
+   CONVERSION TERMINAL
+   ════════════════════════════════════════════════════════════════════ */
+.terminal{margin-top:70px;overflow:hidden}
+.terminal__bar{
+  display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--glass-edge);
+  font-family:var(--f-mono);font-size:12px;color:var(--fg-dim);letter-spacing:.06em;
+}
+.terminal__bar i{width:10px;height:10px;border:1px solid var(--fg-dim)}
+.terminal__bar i:first-child{background:var(--accent);border-color:var(--accent)}
+.terminal__bar span{margin-left:auto}
+.terminal__body{display:grid;grid-template-columns:1.1fr 1fr}
+@media (max-width:860px){.terminal__body{grid-template-columns:1fr}}
+.terminal__log{
+  padding:clamp(22px,3vw,36px);font-family:var(--f-mono);font-size:13px;line-height:1.9;
+  border-right:1px solid var(--glass-edge);min-height:320px;
+}
+@media (max-width:860px){.terminal__log{border-right:0;border-bottom:1px solid var(--glass-edge)}}
+.terminal__log .p{color:var(--accent)}
+.terminal__log .d{color:var(--fg-dim)}
+.caret{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;animation:pulse 1s steps(1) infinite}
+.terminal__actions{padding:clamp(22px,3vw,36px);display:flex;flex-direction:column;gap:14px;justify-content:center}
+.terminal__actions h3{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3.4vw,48px);text-transform:uppercase;line-height:.95;letter-spacing:-.03em;margin-bottom:10px}
+
+/* The primary conversion trigger — a "confirm execution" control */
+.confirm{
+  position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:22px 24px;background:var(--accent);color:#050505;overflow:hidden;
+  font-family:var(--f-mono);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:14px;
+  box-shadow:0 0 0 1px var(--accent),0 0 40px -6px rgba(var(--accent-rgb),.7);
+  will-change:transform;
+}
+.confirm small{display:block;font-weight:500;font-size:11px;opacity:.7;margin-top:4px;letter-spacing:.06em}
+.confirm__key{border:1.5px solid #050505;padding:6px 10px;font-size:12px;white-space:nowrap}
+.confirm::after{ /* scanning beam */
+  content:"";position:absolute;top:0;bottom:0;width:40%;left:-40%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+  animation:beam 2.6s var(--ease) infinite;
+}
+@keyframes beam{to{left:140%}}
+.alt-links{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.alt-links .btn{--pad:16px 18px;justify-content:space-between;font-size:12px}
+@media (max-width:460px){.alt-links{grid-template-columns:1fr}}
+.contact-meta{font-family:var(--f-mono);font-size:12px;color:var(--fg-dim);letter-spacing:.04em;margin-top:6px;word-break:break-all}
+.contact-meta b{color:var(--fg);font-weight:500}
+
+/* ════════════════════════════════════════════════════════════════════
+   FOOTER
+   ════════════════════════════════════════════════════════════════════ */
+footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid var(--fg-faint)}
+.footer__big{
+  font-family:var(--f-display);font-weight:800;text-transform:uppercase;letter-spacing:-.05em;line-height:.8;
+  font-size:clamp(56px,15vw,240px);color:transparent;-webkit-text-stroke:1px var(--fg-faint);
+  white-space:nowrap;overflow:hidden;
+}
+.footer__row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:30px;font-family:var(--f-mono);font-size:12px;color:var(--fg-dim);letter-spacing:.06em;text-transform:uppercase}
+
+/* ════════════════════════════════════════════════════════════════════
+   05 · SCRAMBLE REVEAL STATES
+   ════════════════════════════════════════════════════════════════════ */
+[data-reveal]{opacity:0;transform:translateY(24px);transition:opacity 1s var(--ease),transform 1s var(--ease)}
+[data-reveal].is-in{opacity:1;transform:none}
+.scr-glyph{color:var(--accent);opacity:.85}
+
+/* Accessibility — respect reduced motion completely */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .hero__title .line > span{transform:none}
+  [data-reveal]{opacity:1;transform:none}
+}
+:focus-visible{outline:1px solid var(--accent);outline-offset:4px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+
+<body>
+<!-- ═══ Ambient layers ═══ -->
+<canvas id="field" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<div class="scan" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ═══ Kinetic cursor ═══ -->
+<div class="cursor-ring" aria-hidden="true"></div>
+<div class="cursor-dot" aria-hidden="true"></div>
+
+<!-- ═══ Command HUD ═══ -->
+<nav class="hud" aria-label="Primary">
+  <a href="#top" class="hud__id" data-snap><i class="hud__pulse"></i>PKS // VALUATION</a>
+  <ul class="hud__links">
+    <li><a href="#about" data-snap><span>01</span>Profile</a></li>
+    <li><a href="#services" data-snap><span>02</span>Services</a></li>
+    <li><a href="#method" data-snap><span>03</span>Method</a></li>
+    <li><a href="#record" data-snap><span>04</span>Record</a></li>
+    <li><a href="#contact" data-snap><span>05</span>Engage</a></li>
+  </ul>
+  <div class="hud__right">
+    <span class="hud__time" id="clock">--:--:-- IST</span>
+    <button class="theme-toggle" id="themeToggle" data-snap aria-label="Invert colour theme">
+      <span class="theme-toggle__track"><span class="theme-toggle__knob"></span></span>
+      <span id="themeLabel">Dark</span>
+    </button>
+  </div>
+</nav>
+
+<main id="top">
+  <!-- ════════════════════ HERO ════════════════════ -->
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero__meta">
+        <span><b>●</b> Available for engagements</span>
+        <span>Bangalore · Mangalore · Mysore · Mandya · Hassan</span>
+        <span>12.97°N / 77.59°E</span>
+      </div>
+
+      <h1 class="hero__title" aria-label="Prakash Kumar S — Valuation">
+        <span class="line"><span>Prakash</span></span>
+        <span class="line"><span class="outline">Kumar S</span></span>
+        <span class="line"><span>Valuation<span class="dot">.</span></span></span>
+      </h1>
+
+      <div class="hero__row">
+        <div>
+          <p class="hero__role" data-scramble>Property &amp; Company Valuation Specialist</p>
+          <p class="hero__lede">
+            Civil engineer turned valuation professional. <strong>10+ years in the built environment</strong>
+            and <strong>5+ years valuing residential, commercial and industrial assets</strong> for NBFC lending
+            and private clients — defensible numbers, backed by site inspection and sound method.
+          </p>
+        </div>
+        <div class="hero__cta">
+          <a href="#contact" class="btn btn--solid" data-magnetic data-snap>
+            <span class="btn__label">Request a valuation</span><span class="btn__arrow">→</span>
+          </a>
+          <a href="#services" class="btn" data-magnetic data-snap>
+            <span class="btn__label">View services</span><span class="btn__arrow">↓</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-cue" aria-hidden="true"><i></i>Scroll</div>
+  </section>
+
+  <!-- ════════════════════ TICKER ════════════════════ -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span class="ticker__item">Residential</span><span class="ticker__item">Commercial</span>
+      <span class="ticker__item">Industrial</span><span class="ticker__item">Land &amp; Building</span>
+      <span class="ticker__item">DCF</span><span class="ticker__item">Residual Method</span>
+      <span class="ticker__item">Home Loan / LAP</span><span class="ticker__item">Company Valuation</span>
+      <span class="ticker__item">Residential</span><span class="ticker__item">Commercial</span>
+      <span class="ticker__item">Industrial</span><span class="ticker__item">Land &amp; Building</span>
+      <span class="ticker__item">DCF</span><span class="ticker__item">Residual Method</span>
+      <span class="ticker__item">Home Loan / LAP</span><span class="ticker__item">Company Valuation</span>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PROFILE ════════════════════ -->
+  <section id="about">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>01 / Profile</p>
+      <h2 class="h-section" data-scramble-block>Value, <em>measured</em><br>on the ground.</h2>
+
+      <div class="stats" data-reveal>
+        <div class="stat"><div class="stat__n" data-count="10">0<sup>+</sup></div><div class="stat__l">Years in built environment</div></div>
+        <div class="stat"><div class="stat__n" data-count="5">0<sup>+</sup></div><div class="stat__l">Years in valuation</div></div>
+        <div class="stat"><div class="stat__n" data-count="5">0</div><div class="stat__l">Karnataka regions covered</div></div>
+        <div class="stat"><div class="stat__n" data-count="6">0</div><div class="stat__l">Languages spoken</div></div>
+      </div>
+
+      <div class="about__grid" data-reveal>
+        <div>
+          <p>Currently <strong>Area Technical Manager at Cholamandalam Investment &amp; Finance</strong>, leading property valuation for Home Loan, LAP and other lending verticals across Mangalore and Mandya.</p>
+          <p>Previously at <strong>Adroit Valuation</strong> as Valuation Analyst and later Assistant Technical Manager — valuing commercial, industrial and residential property across Bangalore, Mangalore, Mysore and Hassan.</p>
+        </div>
+        <div>
+          <p>Trained as a <strong>B.E. Civil Engineer</strong> and site engineer on residential towers and a ground-mounted solar project, then an <strong>MBA in Construction Project Management</strong> at RICS School of Built Environment (Amity University).</p>
+          <p>That mix — construction on site, economics in the classroom, valuation in practice — is what goes into every report. Fluent in English, Kannada, Hindi, Telugu, Tamil and Tulu.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ SERVICES (MONOLITHS) ════════════════════ -->
+  <section id="services">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>02 / Services</p>
+      <h2 class="h-section" data-scramble-block>Three <em>monoliths</em><br>of practice.</h2>
+
+      <div class="monoliths">
+        <!-- Card 01 -->
+        <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
+          <div class="mono-card__visual" aria-hidden="true">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+          </div>
+          <div class="shutter shutter--top" aria-hidden="true"></div>
+          <div class="shutter shutter--bot" aria-hidden="true"></div>
+          <div class="mono-card__shade" aria-hidden="true"></div>
+          <div class="mono-card__glare" aria-hidden="true"></div>
+          <header>
+            <div class="mono-card__idx"><b>SVC—01</b><span>Property</span></div>
+            <h3>Property<br>Valuation</h3>
+          </header>
+          <footer>
+            <p>Market-value reports for residential, commercial and industrial property — for bank &amp; NBFC loans, purchase, sale, or family settlement.</p>
+            <ul><li>Residential</li><li>Commercial</li><li>Industrial</li><li>Land</li></ul>
+          </footer>
+        </article>
+
+        <!-- Card 02 -->
+        <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
+          <div class="mono-card__visual" aria-hidden="true">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+          </div>
+          <div class="shutter shutter--top" aria-hidden="true"></div>
+          <div class="shutter shutter--bot" aria-hidden="true"></div>
+          <div class="mono-card__shade" aria-hidden="true"></div>
+          <div class="mono-card__glare" aria-hidden="true"></div>
+          <header>
+            <div class="mono-card__idx"><b>SVC—02</b><span>Enterprise</span></div>
+            <h3>Company<br>Valuation</h3>
+          </header>
+          <footer>
+            <p>Asset-based and income-based valuation of businesses — DCF modelling, tangible asset review and a clear, documented value conclusion.</p>
+            <ul><li>DCF</li><li>Asset-based</li><li>Fixed assets</li><li>Advisory</li></ul>
+          </footer>
+        </article>
+
+        <!-- Card 03 -->
+        <article class="mono-card pane" data-tilt data-snap="frame" tabindex="0">
+          <div class="mono-card__visual" aria-hidden="true">
+            <img loading="lazy" alt="" src="https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=1000&q=70&auto=format&fit=crop" onerror="this.remove()">
+          </div>
+          <div class="shutter shutter--top" aria-hidden="true"></div>
+          <div class="shutter shutter--bot" aria-hidden="true"></div>
+          <div class="mono-card__shade" aria-hidden="true"></div>
+          <div class="mono-card__glare" aria-hidden="true"></div>
+          <header>
+            <div class="mono-card__idx"><b>SVC—03</b><span>Technical</span></div>
+            <h3>Estimation &amp;<br>Due Diligence</h3>
+          </header>
+          <footer>
+            <p>Construction cost estimates, stage-of-construction checks and technical due diligence for lenders, builders and individual home owners.</p>
+            <ul><li>Cost estimate</li><li>Stage check</li><li>Site inspection</li></ul>
+          </footer>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ METHOD ════════════════════ -->
+  <section id="method">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>03 / Method</p>
+      <h2 class="h-section" data-scramble-block>How the <em>number</em><br>is built.</h2>
+
+      <div class="methods" data-reveal>
+        <div class="method"><span class="method__code">M.01</span><div><h4>Market approach</h4><p>Comparable sales and current market rates, adjusted for location, access, frontage and legal status.</p></div></div>
+        <div class="method"><span class="method__code">M.02</span><div><h4>Land &amp; building</h4><p>Land value plus depreciated replacement cost of the structure — the workhorse for lending valuations.</p></div></div>
+        <div class="method"><span class="method__code">M.03</span><div><h4>Discounted cash flow</h4><p>Projected income discounted to present value — for income-producing property and company valuation.</p></div></div>
+        <div class="method"><span class="method__code">M.04</span><div><h4>Residual method</h4><p>Gross development value minus costs and developer's margin — for land with development potential.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ RECORD ════════════════════ -->
+  <section id="record">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>04 / Record</p>
+      <h2 class="h-section" data-scramble-block>Service <em>log</em>.</h2>
+
+      <div class="log">
+        <div class="log__row" data-reveal>
+          <div class="log__when"><b>Sep 2024 — Present</b>Current</div>
+          <div class="log__what"><h4>Area Technical Manager</h4><span>Cholamandalam Investment &amp; Finance</span></div>
+          <p class="log__desc">Property valuation for HL, LAP and other verticals. Region: Mangalore &amp; Mandya.</p>
+        </div>
+        <div class="log__row" data-reveal>
+          <div class="log__when"><b>Apr 2023 — Aug 2024</b>1y 5m</div>
+          <div class="log__what"><h4>Assistant Technical Manager</h4><span>Adroit Valuation</span></div>
+          <p class="log__desc">Commercial, industrial &amp; residential valuation — market, land &amp; building, DCF and residual methods. Bangalore, Mangalore, Mysore, Hassan.</p>
+        </div>
+        <div class="log__row" data-reveal>
+          <div class="log__when"><b>May 2022 — Mar 2023</b>Freelance</div>
+          <div class="log__what"><h4>Estimation &amp; Valuation Analyst</h4><span>Independent practice</span></div>
+          <p class="log__desc">Site visits, market-approach valuation and cost estimation reports for individual residential properties.</p>
+        </div>
+        <div class="log__row" data-reveal>
+          <div class="log__when"><b>Oct 2021 — Apr 2022</b>Start</div>
+          <div class="log__what"><h4>Valuation Analyst</h4><span>Adroit Valuation</span></div>
+          <p class="log__desc">Commercial, industrial and residential valuation using market and land &amp; building methods.</p>
+        </div>
+        <div class="log__row" data-reveal>
+          <div class="log__when"><b>2016 — 2018</b>Site</div>
+          <div class="log__what"><h4>Site Engineer</h4><span>Ampolt Electronics · Shruthika Builders</span></div>
+          <p class="log__desc">Ground-mounted solar project (Pavagada, Challakere) and Spring Fields, a 7-tower residential development.</p>
+        </div>
+      </div>
+
+      <div class="edu">
+        <div class="pane" data-reveal><span class="mono">2019 — 2021</span><h5 style="margin-top:12px">MBA · Construction Project Management</h5><p>RICS School of Built Environment, Amity University (Mumbai)</p></div>
+        <div class="pane" data-reveal><span class="mono">2016</span><h5 style="margin-top:12px">B.E. · Civil Engineering</h5><p>Sri Krishna Institute of Technology, Bangalore (VTU)</p></div>
+        <div class="pane" data-reveal><span class="mono">2020</span><h5 style="margin-top:12px">Management Trainee</h5><p>Gestione Ministration — report on value management in institutional &amp; assembly buildings</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════ CONVERSION TERMINAL ════════════════════ -->
+  <section id="contact">
+    <div class="wrap">
+      <p class="eyebrow" data-scramble>05 / Engage</p>
+      <h2 class="h-section" data-scramble-block>Initiate a <em>valuation</em>.</h2>
+
+      <div class="terminal pane" data-reveal>
+        <div class="terminal__bar"><i></i><i></i><i></i><span>pks@valuation:~/engage</span></div>
+        <div class="terminal__body">
+          <div class="terminal__log" id="termLog" aria-live="polite"></div>
+          <div class="terminal__actions">
+            <h3>Get your property<br>or company valued.</h3>
+
+            <!-- PRIMARY CONVERSION TRIGGER — opens a detached tab; this page stays put -->
+            <a class="confirm" data-magnetic data-snap
+               href="https://wa.me/917760759554?text=Hi%20Prakash%2C%20I%27d%20like%20a%20valuation%20for%20my%20property%2Fcompany."
+               target="_blank" rel="noopener noreferrer">
+              <span>Confirm · Start on WhatsApp<small>Response on the same working day</small></span>
+              <span class="confirm__key">[ ENTER ]</span>
+            </a>
+
+            <div class="alt-links">
+              <a class="btn" data-magnetic data-snap href="tel:+917760759554"><span class="btn__label">Call</span><span class="btn__arrow">→</span></a>
+              <a class="btn" data-magnetic data-snap href="mailto:Prakashkumarbangalore121@gmail.com?subject=Valuation%20enquiry" target="_blank" rel="noopener noreferrer"><span class="btn__label">Email</span><span class="btn__arrow">→</span></a>
+            </div>
+            <p class="contact-meta"><b>+91 77607 59554</b> · Prakashkumarbangalore121@gmail.com</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="footer__big" aria-hidden="true">Prakash Kumar S</div>
+    <div class="footer__row">
+      <span>© <span id="yr"></span> Prakash Kumar S</span>
+      <span>Property &amp; Company Valuation · Karnataka</span>
+      <a href="#top" data-snap>Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   RUNTIME
+   A single rAF loop (tick) drives: canvas physics, cursor, tilt,
+   magnetic buttons. Each subsystem registers an update(dt) callback.
+   ════════════════════════════════════════════════════════════════════ */
+(() => {
+  'use strict';
+
+  const root   = document.documentElement;
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FINE    = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const lerp    = (a, b, t) => a + (b - a) * t;
+  const clamp   = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* Shared pointer state — written by events, read inside rAF only */
+  const pointer = { x: innerWidth / 2, y: innerHeight / 2, vx: 0, vy: 0, px: 0, py: 0, active: false, down: false };
+  addEventListener('pointermove', e => {
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+  }, { passive: true });
+  addEventListener('pointerleave', () => { pointer.active = false; });
+  document.addEventListener('mouseleave', () => { pointer.active = false; });
+  addEventListener('pointerdown', () => { pointer.down = true; });
+  addEventListener('pointerup',   () => { pointer.down = false; });
+
+  const systems = [];
+  let last = performance.now();
+  let running = true;
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); // clamp to avoid tab-switch explosions
+    last = now;
+    // pointer velocity (px/frame, smoothed) — feeds the ripple intensity
+    pointer.vx = lerp(pointer.vx, pointer.x - pointer.px, 0.3);
+    pointer.vy = lerp(pointer.vy, pointer.y - pointer.py, 0.3);
+    pointer.px = pointer.x; pointer.py = pointer.y;
+    for (let i = 0; i < systems.length; i++) systems[i](dt, now);
+    if (running) requestAnimationFrame(tick);
+  }
+  document.addEventListener('visibilitychange', () => {
+    running = !document.hidden;
+    if (running) { last = performance.now(); requestAnimationFrame(tick); }
+  });
+
+  /* ══════════════════════════════════════════════════════════════════
+     02 · CANVAS NODE FIELD
+     A lattice of nodes, each tethered to its home position by a spring.
+     The cursor applies a radial impulse with smooth distance attenuation
+       f = (1 - d/R)^2 * strength * (1 + speed)
+     so fast swipes cause violent ripples and slow hovers a gentle warp.
+     A travelling sine wave adds idle "breathing". Nearby nodes inside
+     the cursor radius are linked with accent lines.
+     ══════════════════════════════════════════════════════════════════ */
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let W = 0, H = 0, DPR = 1, nodes = [], spacing = 34, focusBoost = 0, focusTarget = 0;
+  let nodeRGB = '245,245,245', accentRGB = '0,255,102';
+
+  function readColors() {
+    const cs = getComputedStyle(root);
+    nodeRGB   = cs.getPropertyValue('--node-rgb').trim()   || nodeRGB;
+    accentRGB = cs.getPropertyValue('--accent-rgb').trim() || accentRGB;
+  }
+
+  function buildField() {
+    DPR = Math.min(devicePixelRatio || 1, W > 1800 ? 1.5 : 2); // cap fill-rate on 4K
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // Scale density with area so mobile stays ~60fps and 4K stays dense but bounded
+    spacing = clamp(Math.sqrt((W * H) / 1400), 26, 48);
+    nodes = [];
+    const cols = Math.ceil(W / spacing) + 1, rows = Math.ceil(H / spacing) + 1;
+    const ox = (W - (cols - 1) * spacing) / 2, oy = (H - (rows - 1) * spacing) / 2;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const hx = ox + c * spacing, hy = oy + r * spacing;
+      nodes.push({ hx, hy, x: hx, y: hy, vx: 0, vy: 0, seed: Math.random() * 6.283 });
+    }
+  }
+  let rsT;
+  addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(buildField, 120); });
+  readColors(); buildField();
+
+  const K_SPRING = 38;   // spring stiffness back to home
+  const DAMP     = 7.5;  // velocity damping
+  const RADIUS   = 190;  // cursor influence radius (px)
+  const STRENGTH = 2600; // base impulse
+
+  systems.push((dt, now) => {
+    const t = now * 0.001;
+    focusBoost = lerp(focusBoost, focusTarget, 0.06);
+    ctx.clearRect(0, 0, W, H);
+    const px = pointer.x, py = pointer.y;
+    const speed = Math.min(Math.hypot(pointer.vx, pointer.vy) / 12, 3);
+    const R = RADIUS * (1 + focusBoost * 0.6), R2 = R * R;
+    const push = (REDUCED ? 0 : STRENGTH) * (1 + speed * 1.6) * (1 + focusBoost);
+
+    // physics + draw nodes
+    ctx.fillStyle = `rgba(${nodeRGB},0.32)`;
+    ctx.beginPath();
+    const near = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      // idle breathing wave
+      const wave = REDUCED ? 0 : Math.sin(t * 1.2 + n.hx * 0.012 + n.hy * 0.008) * 2.2;
+      let ax = (n.hx - n.x) * K_SPRING - n.vx * DAMP;
+      let ay = (n.hy + wave - n.y) * K_SPRING - n.vy * DAMP;
+      if (pointer.active) {
+        const dx = n.x - px, dy = n.y - py, d2 = dx * dx + dy * dy;
+        if (d2 < R2 && d2 > 0.01) {
+          const d = Math.sqrt(d2), f = (1 - d / R);
+          const fa = f * f * push / d;
+          ax += dx * fa; ay += dy * fa;
+          // tangential swirl in the cursor's direction of travel
+          ax += pointer.vx * f * 40; ay += pointer.vy * f * 40;
+          near.push(n);
+        }
+      }
+      n.vx += ax * dt; n.vy += ay * dt;
+      n.x  += n.vx * dt; n.y  += n.vy * dt;
+      ctx.rect(n.x - 0.75, n.y - 0.75, 1.5, 1.5);
+    }
+    ctx.fill();
+
+    // accent nodes + link lines inside cursor radius
+    if (near.length) {
+      ctx.lineWidth = 1;
+      const maxLink = spacing * 1.6, maxLink2 = maxLink * maxLink;
+      ctx.beginPath();
+      for (let i = 0; i < near.length; i++) {
+        const a = near[i];
+        for (let j = i + 1; j < near.length; j++) {
+          const b = near[j], dx = a.x - b.x, dy = a.y - b.y;
+          if (dx * dx + dy * dy < maxLink2) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        }
+      }
+      ctx.strokeStyle = `rgba(${accentRGB},${0.22 + focusBoost * 0.2})`;
+      ctx.stroke();
+      ctx.fillStyle = `rgba(${accentRGB},0.95)`;
+      ctx.beginPath();
+      for (const n of near) {
+        const disp = Math.min(Math.hypot(n.x - n.hx, n.y - n.hy) / 20, 1);
+        const s = 1.2 + disp * 2.2;
+        ctx.rect(n.x - s / 2, n.y - s / 2, s, s);
+      }
+      ctx.fill();
+    }
+  });
+
+  /* ══════════════════════════════════════════════════════════════════
+     03 · KINETIC CURSOR
+     Dot tracks 1:1 (transform only). Ring lerps toward either the
+     pointer (free mode) or the hovered [data-snap] element's bounding
+     box (snap mode), interpolating x/y/w/h independently.
+     ══════════════════════════════════════════════════════════════════ */
+  if (FINE && !REDUCED) {
+    root.classList.add('has-cursor');
+    const dot = document.querySelector('.cursor-dot');
+    const ring = document.querySelector('.cursor-ring');
+    const R = { x: pointer.x, y: pointer.y, w: 38, h: 38 };
+    let target = null;
+
+    document.addEventListener('pointerover', e => {
+      const el = e.target.closest('[data-snap]');
+      target = el;
+      const frame = !!el && el.dataset.snap === 'frame';
+      ring.classList.toggle('is-snapped', !!el && !frame);
+      ring.classList.toggle('is-frame', frame);
+    });
+
+    systems.push(() => {
+      dot.style.transform = `translate3d(${pointer.x}px,${pointer.y}px,0)`;
+      let tx, ty, tw, th, k;
+      if (target && document.contains(target)) {
+        const b = target.getBoundingClientRect();
+        const pad = 6;
+        tw = b.width + pad * 2; th = b.height + pad * 2;
+        // slight magnetic lean toward the pointer inside the box
+        tx = b.left - pad + (pointer.x - (b.left + b.width / 2)) * 0.08;
+        ty = b.top  - pad + (pointer.y - (b.top + b.height / 2)) * 0.08;
+        k = 0.22;
+      } else {
+        const s = pointer.down ? 26 : 38;
+        tw = s; th = s; tx = pointer.x - s / 2; ty = pointer.y - s / 2; k = 0.18;
+      }
+      R.x = lerp(R.x, tx, k); R.y = lerp(R.y, ty, k);
+      R.w = lerp(R.w, tw, k); R.h = lerp(R.h, th, k);
+      ring.style.width = R.w + 'px'; ring.style.height = R.h + 'px';
+      ring.style.transform = `translate3d(${R.x}px,${R.y}px,0)`;
+      ring.classList.toggle('is-down', pointer.down && !target);
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     04 · 3D TILT ENGINE
+     Each [data-tilt] card lerps rotateX / rotateY / translateZ toward a
+     target computed from the pointer's normalised position inside the
+     card. While any card is hovered, the canvas "focus" intensifies.
+     ══════════════════════════════════════════════════════════════════ */
+  const tiltCards = [...document.querySelectorAll('[data-tilt]')].map(el => ({
+    el, rx: 0, ry: 0, z: 0, trx: 0, try_: 0, tz: 0, hover: false
+  }));
+  if (FINE && !REDUCED) {
+    tiltCards.forEach(c => {
+      c.el.addEventListener('pointerenter', () => { c.hover = true;  focusTarget = 1; });
+      c.el.addEventListener('pointerleave', () => { c.hover = false; focusTarget = 0; c.trx = c.try_ = c.tz = 0; });
+      c.el.addEventListener('pointermove', e => {
+        const b = c.el.getBoundingClientRect();
+        const nx = (e.clientX - b.left) / b.width  - 0.5;   // -0.5 … 0.5
+        const ny = (e.clientY - b.top)  / b.height - 0.5;
+        c.try_ = nx * 16;   // rotateY
+        c.trx  = -ny * 12;  // rotateX
+        c.tz   = 40;
+        c.el.style.setProperty('--gx', (nx + 0.5) * 100 + '%');
+        c.el.style.setProperty('--gy', (ny + 0.5) * 100 + '%');
+      });
+    });
+    systems.push(() => {
+      for (const c of tiltCards) {
+        c.rx = lerp(c.rx, c.trx, 0.1); c.ry = lerp(c.ry, c.try_, 0.1); c.z = lerp(c.z, c.tz, 0.1);
+        if (Math.abs(c.rx) + Math.abs(c.ry) + c.z < 0.01 && !c.hover) { c.el.style.transform = ''; continue; }
+        c.el.style.transform = `rotateX(${c.rx.toFixed(3)}deg) rotateY(${c.ry.toFixed(3)}deg) translateZ(${c.z.toFixed(2)}px)`;
+      }
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     06 · MAGNETIC BUTTONS
+     Button body and inner label are pulled toward the pointer at
+     different ratios, creating a parallax depth between the two.
+     ══════════════════════════════════════════════════════════════════ */
+  if (FINE && !REDUCED) {
+    const mags = [...document.querySelectorAll('[data-magnetic]')].map(el => ({
+      el, label: el.querySelector('.btn__label'), x: 0, y: 0, tx: 0, ty: 0
+    }));
+    mags.forEach(m => {
+      m.el.addEventListener('pointermove', e => {
+        const b = m.el.getBoundingClientRect();
+        m.tx = (e.clientX - (b.left + b.width / 2)) * 0.32;
+        m.ty = (e.clientY - (b.top + b.height / 2)) * 0.42;
+      });
+      m.el.addEventListener('pointerleave', () => { m.tx = 0; m.ty = 0; });
+    });
+    systems.push(() => {
+      for (const m of mags) {
+        m.x = lerp(m.x, m.tx, 0.16); m.y = lerp(m.y, m.ty, 0.16);
+        m.el.style.transform = `translate3d(${m.x.toFixed(2)}px,${m.y.toFixed(2)}px,0)`;
+        if (m.label) m.label.style.transform = `translate3d(${(m.x * 0.35).toFixed(2)}px,${(m.y * 0.35).toFixed(2)}px,0)`;
+      }
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     05 · CYBER SCRAMBLE ENGINE
+     Characters resolve left→right. Each glyph cycles through binary and
+     cybernetic symbols for a randomised number of frames before locking
+     to its final value. Works on plain text and on elements containing
+     <br>/<em> (text nodes are scrambled in place, markup preserved).
+     ══════════════════════════════════════════════════════════════════ */
+  const GLYPHS = '01アイウエオカキクケコ<>/\\[]{}#$%&*+=!?_|01011010';
+  const rand = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
+
+  function scrambleTextNode(node, duration) {
+    const final = node.textContent;
+    const len = final.length;
+    const start = performance.now();
+    // per-character resolve time, sequential with jitter
+    const lock = Array.from({ length: len }, (_, i) => (i / len) * duration * 0.75 + Math.random() * duration * 0.25);
+    return new Promise(res => {
+      function frame(now) {
+        const el = now - start;
+        let out = '';
+        for (let i = 0; i < len; i++) {
+          const ch = final[i];
+          out += (ch === ' ' || el >= lock[i]) ? ch : rand();
+        }
+        node.textContent = out;
+        if (el < duration) requestAnimationFrame(frame); else { node.textContent = final; res(); }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  function scramble(el) {
+    if (el.dataset.scrambled) return;
+    el.dataset.scrambled = '1';
+    if (REDUCED) return;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const nodes = []; let n;
+    while ((n = walker.nextNode())) if (n.textContent.trim()) nodes.push(n);
+    const total = el.textContent.length;
+    nodes.forEach(tn => scrambleTextNode(tn, clamp(total * 28, 500, 1300)));
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     VIEWPORT OBSERVER — triggers scramble, reveal and counters
+     ══════════════════════════════════════════════════════════════════ */
+  function countUp(el) {
+    const to = +el.dataset.count, sup = el.querySelector('sup');
+    const supHTML = sup ? sup.outerHTML : '';
+    const t0 = performance.now(), dur = REDUCED ? 0 : 1400;
+    (function step(now) {
+      const p = dur ? clamp((now - t0) / dur, 0, 1) : 1;
+      const eased = 1 - Math.pow(1 - p, 4);
+      el.innerHTML = Math.round(to * eased) + supHTML;
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const el = e.target;
+      if (el.hasAttribute('data-scramble') || el.hasAttribute('data-scramble-block')) scramble(el);
+      if (el.hasAttribute('data-reveal')) {
+        el.classList.add('is-in');
+        el.querySelectorAll('[data-count]').forEach(countUp);
+      }
+      io.unobserve(el);
+    }
+  }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('[data-scramble],[data-scramble-block],[data-reveal]').forEach(el => io.observe(el));
+
+  /* ══════════════════════════════════════════════════════════════════
+     CONVERSION TERMINAL — typed boot log when the panel enters view
+     ══════════════════════════════════════════════════════════════════ */
+  const termLog = document.getElementById('termLog');
+  const LINES = [
+    ['p', '$ ', 'init valuation --client new'],
+    ['d', '', '› loading scope ........... property | company'],
+    ['d', '', '› methods ................. market · L&B · DCF · residual'],
+    ['d', '', '› coverage ................ BLR · MLR · MYS · MND · HSN'],
+    ['d', '', '› site inspection ......... scheduled on confirmation'],
+    ['p', '✔ ', 'ready — awaiting confirmation'],
+  ];
+  let termStarted = false;
+  new IntersectionObserver((es, obs) => {
+    if (!es[0].isIntersecting || termStarted) return;
+    termStarted = true; obs.disconnect();
+    (async () => {
+      for (const [cls, pre, txt] of LINES) {
+        const line = document.createElement('div');
+        const p = document.createElement('span'); p.className = 'p'; p.textContent = pre;
+        const s = document.createElement('span'); s.className = cls;
+        line.append(p, s); termLog.append(line);
+        for (let i = 1; i <= txt.length; i++) {
+          s.textContent = txt.slice(0, i);
+          if (!REDUCED) await new Promise(r => setTimeout(r, 14));
+        }
+        if (!REDUCED) await new Promise(r => setTimeout(r, 160));
+      }
+      const c = document.createElement('div');
+      c.innerHTML = '<span class="p">$ </span><span class="caret"></span>';
+      termLog.append(c);
+    })();
+  }, { threshold: 0.3 }).observe(termLog);
+
+  /* ══════════════════════════════════════════════════════════════════
+     07 · THEME INVERTER + HUD CLOCK
+     ══════════════════════════════════════════════════════════════════ */
+  const toggle = document.getElementById('themeToggle');
+  const label  = document.getElementById('themeLabel');
+  function applyTheme(t) {
+    if (t === 'light') root.setAttribute('data-theme', 'light'); else root.removeAttribute('data-theme');
+    label.textContent = t === 'light' ? 'Light' : 'Dark';
+    document.querySelector('meta[name="theme-color"]').content = t === 'light' ? '#f2f2ee' : '#050505';
+    requestAnimationFrame(readColors); // canvas picks up the new spectrum
+  }
+  let theme = 'dark';
+  try { theme = localStorage.getItem('pks-theme') || 'dark'; } catch (_) {}
+  applyTheme(theme);
+  toggle.addEventListener('click', () => {
+    theme = theme === 'light' ? 'dark' : 'light';
+    applyTheme(theme);
+    try { localStorage.setItem('pks-theme', theme); } catch (_) {}
+  });
+
+  const clock = document.getElementById('clock');
+  const fmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+  const updClock = () => { clock.textContent = fmt.format(new Date()) + ' IST'; };
+  updClock(); setInterval(updClock, 1000);
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // Hero role line decodes on load
+  requestAnimationFrame(tick);
+  setTimeout(() => document.querySelectorAll('.hero [data-scramble]').forEach(scramble), 500);
+})();
+</script>
+</body>
+</html>
