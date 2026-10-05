@@ -1069,7 +1069,6 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
                 <span>Confirm · Start on WhatsApp<small>Chat directly with Prakash</small></span>
                 <span class="confirm__key">[ ENTER ]</span>
               </a>
-              <a class="btn" data-magnetic data-snap href="tel:+917760759554"><span class="btn__label">Call +91 77607 59554</span><span class="btn__arrow">→</span></a>
             </div>
           </div>
 
@@ -1570,7 +1569,7 @@ footer.site{position:relative;z-index:2;padding:60px 0 40px;border-top:1px solid
         form.reset();
       } catch (err) {
         btn.disabled = false;
-        status.textContent = 'Could not send (' + String(err.message || 'network error').slice(0, 80) + ') — please WhatsApp or call';
+        status.textContent = 'Could not send (' + String(err.message || 'network error').slice(0, 80) + ') — please WhatsApp';
         console.warn('[enquiry] Formspree:', err);
       }
     });
